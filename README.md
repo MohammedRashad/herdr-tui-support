@@ -17,7 +17,7 @@ It needs only the system `python3` (3.9 or later); there are no dependencies.
 
 ```sh
 git clone https://github.com/<you>/herdr-tui-support.git ~/herdr-tui
-ln -sf ~/herdr-tui/herdr-tui ~/.local/bin/herdr-tui
+ln -sf ~/herdr-tui/herdr-tui.py ~/.local/bin/herdr-tui
 ```
 
 ## Using it from your phone
