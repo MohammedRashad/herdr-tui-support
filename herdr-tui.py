@@ -48,7 +48,56 @@ PEEK
 q quits to your shell.   any key closes this help"""
 
 
+DEMO = False  # --demo: made-up workspace, never calls hc/herdr-app
+
+DEMO_DOC = {"spaces": [
+    {"id": "sp1", "name": "api-server", "folder": "~/code/api-server", "tabs": [
+        {"id": "tb1", "name": "auth refactor", "terminals": [
+            {"terminal": "t3", "status": "blocked", "app": "claude-code"}]},
+        {"id": "tb2", "name": "2", "terminals": [{"terminal": "t4", "status": None, "app": None}]}]},
+    {"id": "sp2", "name": "web-app", "folder": "~/code/web-app", "tabs": [
+        {"id": "tb3", "name": "checkout", "terminals": [
+            {"terminal": "t7", "status": "working", "app": "claude-code", "sub_agents": [
+                {"terminal": "t8", "status": "working", "app": "claude-code", "name": "reviewer"}]}]},
+        {"id": "tb4", "name": "e2e tests", "terminals": [
+            {"terminal": "t9", "status": "done", "app": "codex"}]}]},
+    {"id": "sp3", "name": "docs-site", "folder": "~/code/docs-site", "tabs": [
+        {"id": "tb5", "name": "1", "terminals": [{"terminal": "t12", "status": "idle", "app": "claude-code"}]}]},
+    {"id": "sp4", "name": "infra", "folder": "~/code/infra", "tabs": [
+        {"id": "tb6", "name": "terraform", "terminals": [
+            {"terminal": "t15", "status": "working", "app": "claude-code"}]},
+        {"id": "tb7", "name": "2", "terminals": [{"terminal": "t16", "status": None, "app": None}]}]},
+    {"id": "sp5", "name": "~", "folder": "~", "tabs": [
+        {"id": "tb8", "name": "1", "terminals": [{"terminal": "t1", "status": None, "app": None}]}]},
+]}
+
+DEMO_SCREENS = {"t3": """\
+● I'll move session storage to the new token
+  store and update the middleware.
+
+● Update(src/auth/session.ts)
+  ⎿  Updated with 14 additions, 6 removals
+
+● Update(src/auth/middleware.ts)
+  ⎿  Updated with 3 additions, 9 removals
+
+● Now let me run the auth tests.
+
+╭──────────────────────────────────────────╮
+│ Bash command                             │
+│                                          │
+│   npm test -- src/auth                   │
+│                                          │
+│ Do you want to proceed?                  │
+│ ❯ 1. Yes                                 │
+│   2. Yes, don't ask again for npm test   │
+│   3. No, tell Claude what to do          │
+╰──────────────────────────────────────────╯"""}
+
+
 def run(cmd, *args, timeout=15):
+    if DEMO:
+        return 1, "", "demo mode: nothing was changed"
     try:
         p = subprocess.run([cmd, *args], capture_output=True, text=True, timeout=timeout)
     except subprocess.TimeoutExpired:
@@ -89,6 +138,8 @@ def last_line(text, fallback):
 
 def load_world():
     """Returns (spaces, app_ok, err). spaces = [{id,name,folder,machine,tabs:[{id,name,terms:[...]}]}]."""
+    if DEMO:
+        return _from_app(DEMO_DOC, {}), True, ""
     code, out, err = hc("ls", "--json")
     hc_terms = {}
     hc_err = ""
@@ -277,9 +328,13 @@ class App:
         h, w = self.scr.getmaxyx()
         if y < 0 or y >= h or x >= w:
             return
-        s = s[: max(0, w - x - (1 if y == h - 1 else 0))]
+        s = s[: max(0, w - x)]
         try:
-            self.scr.addstr(y, x, s, attr)
+            if y == h - 1:
+                # addstr can't fill the bottom-right cell; insstr can
+                self.scr.insstr(y, x, s, attr)
+            else:
+                self.scr.addstr(y, x, s, attr)
         except curses.error:
             pass
 
@@ -375,6 +430,9 @@ class App:
         self.scr.timeout(250)
 
     def attach(self, addr):
+        if DEMO:
+            self.flash(f"demo mode: would attach to {addr}")
+            return
         curses.def_prog_mode()
         curses.endwin()
         sys.stdout.write(f"\r\nattaching to {addr} — ctrl+\\ to come back\r\n")
@@ -551,6 +609,9 @@ class App:
         spin = SPINNER[self.tick % 4] if counts.get("working") else " "
         parts = [f"{counts[s]} {s}" for s in ("blocked", "done", "working", "idle") if counts.get(s)]
         head = f" herdr {spin} " + (" · ".join(parts) or "no agents")
+        if len(head) + 7 > w:  # phone width: compact counts
+            head = f" herdr {spin} " + (" ".join(f"{GLYPH[s]}{counts[s]}" for s in
+                                                ("blocked", "done", "working", "idle") if counts.get(s)) or "no agents")
         clock = time.strftime("%H:%M ")
         self.put(0, 0, head.ljust(w), self.C["bar"])
         if len(head) + len(clock) < w:
@@ -598,7 +659,7 @@ class App:
                 continue
             _, sp, tb, t = r
             st = t.get("status")
-            indent = "  " + "  " * t["depth"] + ("↳" if t["depth"] else "")
+            indent = "  " + "  " * t["depth"] + ("↳ " if t["depth"] else "")
             left = f"{indent}{GLYPH.get(st, '?')} "
             label = t.get("name") or short_agent(t.get("agent")) or "shell"
             mid_w = max(4, min(40, w - len(left) - 9 - 5))
@@ -762,6 +823,8 @@ class Peek:
 
     def load(self):
         code, out, err = hc("read", self.t["address"], "--lines", "400")
+        if DEMO:
+            code, out = 0, DEMO_SCREENS.get(self.t["address"], "$ ")
         if code == 0:
             lines = out.rstrip("\n").split("\n")
             while lines and not lines[-1].strip():
@@ -859,10 +922,12 @@ class Peek:
 
 
 def main():
+    global DEMO
     if len(sys.argv) > 1 and sys.argv[1] in ("-h", "--help"):
-        print(__doc__)
+        print(__doc__ + "\n--demo  show a made-up workspace (changes nothing)")
         return
-    if not os.path.exists(HC):
+    DEMO = "--demo" in sys.argv[1:]
+    if not DEMO and not os.path.exists(HC):
         sys.exit(f"herdr-tui: can't find hc (looked at {HC}); set HC=/path/to/hc")
     os.environ.setdefault("ESCDELAY", "25")
     curses.wrapper(lambda scr: App(scr).run())

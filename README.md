@@ -2,6 +2,10 @@
 
 A terminal front-end for herdr that replaces the removed TUI, so you can follow agents and manage spaces and tabs from a phone over SSH.
 
+![herdr-tui at phone width: the agent list, and a peek at a blocked agent's permission prompt](docs/screenshot.png)
+
+To try it without herdr, run `herdr-tui --demo`. It shows a made-up workspace and changes nothing.
+
 ## How it works
 
 `herdr-tui` uses two interfaces:
