@@ -97,3 +97,7 @@ On a space row, these keys act on the space; on an agent row, they act on that a
 | `HC` | found on PATH, else `~/.local/bin/` | Path to `hc` |
 | `HERDR_APP` | found on PATH, else `~/.local/bin/` | Path to `herdr-app` |
 | `HERDR_APP_BUNDLE` | `~/Applications/Herdr.app` | The app that `o` opens |
+
+## License
+
+MIT. See [LICENSE](LICENSE).
