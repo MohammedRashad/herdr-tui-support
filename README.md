@@ -16,7 +16,7 @@ If the Herdr app isn't running, the list falls back to `hc` alone and structure 
 It needs only the system `python3` (3.9 or later); there are no dependencies.
 
 ```sh
-git clone https://github.com/<you>/herdr-tui.git ~/herdr-tui
+git clone https://github.com/<you>/herdr-tui-support.git ~/herdr-tui
 ln -sf ~/herdr-tui/herdr-tui ~/.local/bin/herdr-tui
 ```
 
